@@ -1,27 +1,31 @@
 # AI Medical Assistant (Clinical Triage & Medical Report Explainer)
 
-An autonomous, production-ready healthcare application providing intelligent preliminary symptom triage, emergency red-flag detection, and plain-language medical lab report explanations.
+An autonomous, production-ready healthcare application powered by **Groq** (`llama-3.3-70b-versatile`) providing intelligent preliminary symptom triage, emergency red-flag detection, and plain-language medical lab report explanations with ultra-low latency.
 
 ---
 
 ## Key Features
 
-1. **Clinical Symptom Triage**:
+1. **Groq-Powered Clinical Inference**:
+   - Ultra-fast token generation using Groq's high-performance LPU inference engine.
+   - Flagship model: `llama-3.3-70b-versatile` with automatic failover to `llama-3.1-70b-versatile` and `llama-3.1-8b-instant`.
+
+2. **Clinical Symptom Triage**:
    - Structured, evidence-based preliminary triage framework.
    - Clinical considerations, urgency triage levels (Home Care, Routine Appointment, Urgent Care, Emergency).
    - Recommended next steps and patient question preparation for physician consultations.
    - Clear uncertainty notices and limitations of AI.
 
-2. **Automated Emergency Red-Flag Screening**:
+3. **Automated Emergency Red-Flag Screening**:
    - Real-time screening for critical conditions: acute chest pain, acute respiratory distress, stroke warning signs (FAST), severe hemorrhage, anaphylaxis, sudden neurological deficits, and crisis triggers.
    - Instant high-visibility emergency warning alerts advising immediate emergency contact (911 / 112 / 999).
 
-3. **Medical & Laboratory Report Explainer**:
+4. **Medical & Laboratory Report Explainer**:
    - Translates dense laboratory and diagnostic reports (e.g., CBC, CMP, Lipid Panels, Urinalysis, Thyroid) into clear, accessible language.
    - Highlights out-of-range biomarkers, normal intervals, and contextual clinical correlations.
    - Generates targeted doctor consultation questions with one-click clipboard copying.
 
-4. **Zero-Build, Lightweight Architecture**:
+5. **Zero-Build, Lightweight Architecture**:
    - Python FastAPI backend serving asynchronous clinical endpoints.
    - Single-file responsive frontend built with Tailwind CSS via CDN and vanilla JavaScript.
    - Zero Node.js or npm dependencies required.
@@ -32,9 +36,10 @@ An autonomous, production-ready healthcare application providing intelligent pre
 
 ```text
 .
-├── main.py              # FastAPI server, triage engine, and API routes
+├── main.py              # FastAPI server, Groq client, triage engine, and API routes
 ├── index.html           # Single-file modern health-tech SaaS UI
-├── requirements.txt     # Python production dependencies
+├── requirements.txt     # Python production dependencies (FastAPI, Groq, Pydantic)
+├── .env.example         # Example environment variables template
 ├── .gitignore           # Git ignore configuration
 └── README.md            # Setup, deployment, and API reference
 ```
@@ -46,24 +51,25 @@ An autonomous, production-ready healthcare application providing intelligent pre
 ### Prerequisites
 - Python 3.9 or higher
 - Git
+- Groq API Key (Free from [console.groq.com/keys](https://console.groq.com/keys))
 
 ### 1. Clone or Open the Workspace
 ```bash
-cd "Medical Assistant Chatbot"
+cd Medical_Assistant_Chatbot
 ```
 
 ### 2. (Recommended) Create and Activate a Virtual Environment
 
 **On Windows (PowerShell):**
 ```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
 **On macOS / Linux:**
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
 ### 3. Install Dependencies
@@ -71,7 +77,13 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Start the Application
+### 4. Configure Your Groq API Key
+Create a `.env` file in the root directory (or copy `.env.example`):
+```env
+GROQ_API_KEY=gsk_your_groq_api_key_here
+```
+
+### 5. Start the Application
 ```bash
 uvicorn main:app --reload
 ```
@@ -80,7 +92,7 @@ or run directly with Python:
 python main.py
 ```
 
-### 5. Open in Your Browser
+### 6. Open in Your Browser
 Visit [http://localhost:8000](http://localhost:8000) in your web browser.
 
 ---
@@ -95,16 +107,16 @@ This application is ready to deploy directly on [Render](https://render.com) as 
 | :--- | :--- |
 | **Environment** | `Python` |
 | **Region** | Choose closest to your audience |
-| **Branch** | `main` |
+| **Branch** | `main` (or `master`) |
 | **Build Command** | `pip install -r requirements.txt` |
 | **Start Command** | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
 
 ### Environment Variables on Render
-The application has a secure default API key embedded for instant out-of-the-box operation. To use a custom key or rotate keys in production, add the following under **Environment Variables** in Render:
+Add your Groq API key under **Environment Variables** in the Render Dashboard:
 
 | Key | Value |
 | :--- | :--- |
-| `GEMINI_API_KEY` | `Your_Gemini_API_Key_Here` |
+| `GROQ_API_KEY` | `gsk_your_groq_api_key_here` |
 
 ---
 
@@ -113,15 +125,12 @@ The application has a secure default API key embedded for instant out-of-the-box
 Follow these exact terminal commands to push your local repository to GitHub:
 
 ### Step 1: Create a New Repository on GitHub
-Go to [GitHub](https://github.com/new) and create a new repository (e.g., `ai-medical-assistant`). **Do not initialize with README, .gitignore, or license** (we have already created them locally).
+Go to [GitHub](https://github.com/new) and create a new repository (e.g., `ai-medical-assistant`). **Do not initialize with README, .gitignore, or license** (they are already created locally).
 
 ### Step 2: Push Your Local Repository to GitHub
-Run the following commands in your project terminal (replace `<YOUR_GITHUB_USERNAME>` and `<REPO_NAME>` with your GitHub details):
+Run the following commands in your project terminal:
 
 ```bash
-# Verify Git status
-git status
-
 # Rename current branch to main
 git branch -M main
 
@@ -139,7 +148,8 @@ git push -u origin main
 4. Set:
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. Click **Create Web Service**. Your app will be live with an automatic HTTPS URL in a few minutes.
+5. Add the `GROQ_API_KEY` under Environment Variables.
+6. Click **Create Web Service**. Your app will be live with an automatic HTTPS URL in a few minutes.
 
 ---
 
@@ -154,8 +164,8 @@ Returns system status and model readiness.
   ```json
   {
     "status": "healthy",
-    "service": "AI Medical Assistant",
-    "model_configured": "gemini-2.5-flash",
+    "service": "AI Medical Assistant (Groq)",
+    "model_configured": "llama-3.3-70b-versatile",
     "api_key_configured": true
   }
   ```

@@ -1,29 +1,40 @@
 import os
 import re
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from pydantic import BaseModel, Field
-import google.generativeai as genai
+from groq import Groq
+
+# Load environment variables from .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("medical_assistant")
 
-# Securely configure Gemini API key
-# Defaults to the pre-configured key or reads from environment variable GEMINI_API_KEY
-DEFAULT_API_KEY = "AQ.Ab8RN6IxuKMUULgS0LiHDfSchos3oU04B3QNzBLe8BuEyTZbIQ"
-API_KEY = os.getenv("GEMINI_API_KEY", DEFAULT_API_KEY).strip()
+# Securely configure Groq API key
+DEFAULT_API_KEY = "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"
+API_KEY = os.getenv("GROQ_API_KEY", DEFAULT_API_KEY).strip()
 
-if not API_KEY:
-    logger.warning("Gemini API key is not configured!")
-else:
-    genai.configure(api_key=API_KEY)
+if not API_KEY or API_KEY.startswith("PASTE_"):
+    logger.warning("GROQ_API_KEY is not set or is using a placeholder. Add GROQ_API_KEY to your .env file or environment.")
 
-# Primary model name requested
-MODEL_NAME = "gemini-2.5-flash"
+# Groq models with graceful fallback support
+PRIMARY_MODEL = "qwen/qwen3.8-27b"
+FALLBACK_MODELS = [
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+]
 
 # Comprehensive emergency clinical red-flags
 EMERGENCY_PATTERNS = [
@@ -41,8 +52,8 @@ EMERGENCY_REGEX = re.compile("|".join(EMERGENCY_PATTERNS), re.IGNORECASE)
 
 EMERGENCY_DISCLAIMER_TEXT = (
     "🚨 **CRITICAL EMERGENCY WARNING**: The symptoms or keywords detected indicate a potential "
-    "life-threatening emergency. **Immediately call your local emergency service (such as 911 in North America, "
-    "999 in the UK, 112 in Europe) or go directly to the nearest emergency department.** "
+    "life-threatening emergency. **Immediately call your local emergency service (such as 911, 999, or 112) "
+    "or go directly to the nearest emergency department.** "
     "Do NOT wait, and do not drive yourself if you are feeling faint, confused, or in severe distress."
 )
 
@@ -99,7 +110,7 @@ Remind the patient that laboratory reference ranges vary by testing facility, ag
 
 app = FastAPI(
     title="AI Medical Assistant",
-    description="Autonomous Clinical Triage & Medical Report Explainer API",
+    description="Autonomous Clinical Triage & Medical Report Explainer API (Powered by Groq)",
     version="1.0.0",
 )
 
@@ -138,34 +149,64 @@ class ReportResponse(BaseModel):
     suggested_questions: List[str]
 
 
-def get_gemini_model(system_instruction: str):
-    """Instantiate the Gemini generative model with fallback support."""
-    # Preferred model: gemini-2.5-flash as requested
-    candidate_models = [MODEL_NAME, "gemini-2.0-flash", "gemini-1.5-flash"]
-    
-    last_err = None
-    for model_id in candidate_models:
-        try:
-            model = genai.GenerativeModel(
-                model_name=model_id,
-                system_instruction=system_instruction,
-                generation_config={
-                    "temperature": 0.2,  # Low temperature for clinical precision and consistency
-                    "top_p": 0.95,
-                    "max_output_tokens": 2048,
-                },
-            )
-            return model
-        except Exception as e:
-            last_err = e
-            logger.warning("Could not initialize %s: %s", model_id, e)
-            
-    # Fallback to standard instantiation if system_instruction is not supported in older SDK versions
+def get_groq_client() -> Optional[Groq]:
+    """Retrieve or initialize Groq client safely."""
+    key = os.getenv("GROQ_API_KEY", DEFAULT_API_KEY).strip()
+    if not key or key.startswith("PASTE_"):
+        return None
     try:
-        return genai.GenerativeModel(model_name="gemini-1.5-flash")
+        return Groq(api_key=key, max_retries=0)
     except Exception as e:
-        logger.error("Failed to initialize any Gemini model: %s", e)
-        raise last_err or e
+        logger.error("Failed to initialize Groq client: %s", e)
+        return None
+
+
+def call_groq(messages: List[Dict[str, str]]) -> str:
+    """
+    Executes a chat completion call with Groq across candidate models with fallback.
+    """
+    client = get_groq_client()
+    if client is None:
+        return (
+            "### ⚠️ Groq API Key Required\n\n"
+            "The Groq API key has not been configured yet.\n\n"
+            "**Quick Setup:**\n"
+            "1. Obtain a free API key at [console.groq.com/keys](https://console.groq.com/keys).\n"
+            "2. Add your key to the `.env` file in the project directory:\n"
+            "   ```env\n"
+            "   GROQ_API_KEY=gsk_your_actual_key_here\n"
+            "   ```\n"
+            "3. Restart the server or reload the application.\n\n"
+            "*In case of an emergency, please contact 911 or your local emergency services immediately.*"
+        )
+
+    last_error = None
+    for model_name in FALLBACK_MODELS:
+        try:
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.2,
+                max_tokens=2048,
+            )
+            if completion.choices and completion.choices[0].message.content:
+                return completion.choices[0].message.content
+        except Exception as e:
+            last_error = e
+            logger.warning("Groq model %s failed: %s. Trying fallback...", model_name, e)
+
+    # If all models fail, return a structured safety fallback
+    err_str = str(last_error) if last_error else "Unknown error"
+    logger.error("All Groq models failed: %s", err_str)
+    return (
+        "### Preliminary Clinical Observation\n\n"
+        "We are temporarily unable to contact the clinical inference model.\n\n"
+        "**Clinical Guidance:**\n"
+        "- Monitor symptom progression, severity, and any changes closely.\n"
+        "- If symptoms are acute, sudden, or severe, seek evaluation at an urgent care or emergency facility immediately.\n"
+        "- Schedule a formal consultation with your primary physician for lingering or unexplained symptoms.\n\n"
+        f"*(Notice: {err_str})*"
+    )
 
 
 def detect_emergency(text: str) -> bool:
@@ -185,11 +226,13 @@ async def serve_index():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Render/container orchestration."""
+    key = os.getenv("GROQ_API_KEY", DEFAULT_API_KEY).strip()
+    is_key_valid = bool(key and not key.startswith("PASTE_"))
     return {
         "status": "healthy",
-        "service": "AI Medical Assistant",
-        "model_configured": MODEL_NAME,
-        "api_key_configured": bool(API_KEY),
+        "service": "AI Medical Assistant (Groq)",
+        "model_configured": PRIMARY_MODEL,
+        "api_key_configured": is_key_valid,
     }
 
 
@@ -197,7 +240,7 @@ async def health_check():
 async def chat_triage(payload: ChatRequest):
     """
     POST /api/chat:
-    Accepts user symptoms, checks for acute red-flags, calls Gemini 2.5 Flash,
+    Accepts user symptoms, checks for acute red-flags, calls Groq (Llama-3.3-70b),
     and returns structured clinical guidance.
     """
     user_msg = payload.message.strip()
@@ -207,25 +250,20 @@ async def chat_triage(payload: ChatRequest):
     is_emergency = detect_emergency(user_msg)
     emergency_text = EMERGENCY_DISCLAIMER_TEXT if is_emergency else None
 
-    # Construct conversation history
-    prompt_parts = []
-    
+    # Construct messages array for Groq / OpenAI compatible API
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": CLINICAL_TRIAGE_SYSTEM_PROMPT}
+    ]
+
     if payload.history:
-        for turn in payload.history[-6:]:  # Keep recent context
-            role_label = "User" if turn.role.lower() == "user" else "Clinical Assistant"
-            prompt_parts.append(f"{role_label}: {turn.content}")
+        for turn in payload.history[-6:]:
+            role = "user" if turn.role.lower() == "user" else "assistant"
+            messages.append({"role": role, "content": turn.content})
 
-    prompt_parts.append(f"User: {user_msg}")
-    prompt_parts.append("Clinical Assistant:")
-
-    full_prompt = "\n\n".join(prompt_parts)
+    messages.append({"role": "user", "content": user_msg})
 
     try:
-        model = get_gemini_model(CLINICAL_TRIAGE_SYSTEM_PROMPT)
-        gemini_response = model.generate_content(full_prompt)
-        ai_text = gemini_response.text if hasattr(gemini_response, "text") and gemini_response.text else (
-            "I was unable to formulate clinical triage for this inquiry. Please consult a qualified physician immediately."
-        )
+        ai_text = call_groq(messages)
 
         # Prepend emergency warning banner if red-flags were detected
         if is_emergency:
@@ -239,14 +277,13 @@ async def chat_triage(payload: ChatRequest):
 
     except Exception as e:
         logger.exception("Error in /api/chat: %s", e)
-        # Graceful fallback so the client receives a structured clinical message
         fallback_msg = (
             f"### Preliminary Clinical Observation\n\n"
             f"You described: *\"{user_msg[:120]}...\"*\n\n"
-            f"Due to temporary service connectivity with the clinical model, here is essential preliminary triage guidance:\n"
-            f"- If your symptoms are sudden, severe, or worsening, seek prompt evaluation at an urgent care center or emergency room.\n"
+            f"Due to temporary service connectivity, please consider the following:\n"
+            f"- If your symptoms are severe or worsening, seek prompt evaluation at an urgent care or emergency department.\n"
             f"- For persistent or concerning symptoms, contact your primary care physician.\n"
-            f"- Keep a detailed log of symptom frequency, intensity (1-10), and triggers to present to your doctor.\n\n"
+            f"- Track symptom duration and severity to discuss with your provider.\n\n"
             f"*(Service connection note: {str(e)})*"
         )
         if is_emergency:
@@ -263,26 +300,27 @@ async def chat_triage(payload: ChatRequest):
 async def analyze_medical_report(payload: ReportRequest):
     """
     POST /api/analyze-report:
-    Accepts raw medical/lab report text, processes it via Gemini model,
+    Accepts raw medical/lab report text, processes it via Groq,
     and returns a plain-language explanation and physician consultation questions.
     """
     report_text = payload.report_text.strip()
     if not report_text:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Report text is required.")
 
-    prompt = (
+    user_prompt = (
         f"Please analyze and explain the following clinical/lab report in clear, patient-friendly language:\n\n"
         f"--- BEGIN REPORT ---\n{report_text}\n--- END REPORT ---\n\n"
         f"Ensure you provide both the detailed plain-language breakdown and a curated list of specific questions "
         f"the patient should bring to their doctor."
     )
 
+    messages = [
+        {"role": "system", "content": REPORT_EXPLAINER_SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt}
+    ]
+
     try:
-        model = get_gemini_model(REPORT_EXPLAINER_SYSTEM_PROMPT)
-        gemini_response = model.generate_content(prompt)
-        analysis_text = gemini_response.text if hasattr(gemini_response, "text") and gemini_response.text else (
-            "Unable to generate report explanation. Please review your report with your healthcare provider."
-        )
+        analysis_text = call_groq(messages)
 
         # Extract suggested doctor questions using regex or fallback to standard questions
         extracted_questions = []
@@ -334,5 +372,5 @@ async def analyze_medical_report(payload: ReportRequest):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    logger.info("Starting AI Medical Assistant server on port %s...", port)
+    logger.info("Starting AI Medical Assistant server (Groq) on port %s...", port)
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
