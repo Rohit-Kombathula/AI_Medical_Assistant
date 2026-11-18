@@ -1,34 +1,36 @@
-# AI Medical Assistant (Clinical Triage & Medical Report Explainer)
+# AI Medical Assistant (India & Multilingual Edition)
+### Clinical Triage & Medical Report Explainer
 
-An autonomous, production-ready healthcare application powered by **Groq** (`llama-3.3-70b-versatile`) providing intelligent preliminary symptom triage, emergency red-flag detection, and plain-language medical lab report explanations with ultra-low latency.
+An autonomous, production-ready healthcare application tailored for **India's healthcare ecosystem** and powered by **Groq** (`qwen/qwen3.8-27b` with ultra-low latency LPU inference). Provides intelligent preliminary symptom triage, multilingual emergency red-flag screening (English and Telugu), and plain-language medical lab report explanations.
 
 ---
 
 ## Key Features
 
-1. **Groq-Powered Clinical Inference**:
-   - Ultra-fast token generation using Groq's high-performance LPU inference engine.
-   - Flagship model: `llama-3.3-70b-versatile` with automatic failover to `llama-3.1-70b-versatile` and `llama-3.1-8b-instant`.
+1. **India-Centric Healthcare Navigation**:
+   - Integrates India's national emergency services: **108** (Emergency Ambulance), **112** (National Unified Emergency), and Tele-MANAS (**14416**) for mental health crisis support.
+   - Clinical triage routing tailored for Indian infrastructure: Primary Health Centres (PHC), Community Health Centres (CHC), District Hospitals, Area Hospitals, and Hospital Casualty departments.
+   - Evaluates symptoms with awareness of regional epidemiology (e.g., Dengue, Malaria, Typhoid, Chikungunya, viral fevers, heat exhaustion, and pollution-induced respiratory issues).
 
-2. **Clinical Symptom Triage**:
-   - Structured, evidence-based preliminary triage framework.
-   - Clinical considerations, urgency triage levels (Home Care, Routine Appointment, Urgent Care, Emergency).
-   - Recommended next steps and patient question preparation for physician consultations.
-   - Clear uncertainty notices and limitations of AI.
+2. **Multilingual Emergency Red-Flag Screening (Telugu & English)**:
+   - Real-time screening for critical conditions across **Telugu Script** (e.g., `గుండె నొప్పి`, `శ్వాస ఆడట్లేదు`, `పక్షవాతం`), **Romanized Telugu / Tanglish** (e.g., `gundelo noppi`, `oopiri aadatledu`), and **English** (chest pain, shortness of breath, stroke symptoms).
+   - Generates instant emergency warning alerts in the patient's language advising immediate 108 / 112 contact.
 
-3. **Automated Emergency Red-Flag Screening**:
-   - Real-time screening for critical conditions: acute chest pain, acute respiratory distress, stroke warning signs (FAST), severe hemorrhage, anaphylaxis, sudden neurological deficits, and crisis triggers.
-   - Instant high-visibility emergency warning alerts advising immediate emergency contact (911 / 112 / 999).
+3. **Multilingual Clinical Symptom Triage**:
+   - Responds fluently in natural **Telugu (తెలుగు)** when the user prompts in Telugu or Romanized Telugu, and in English for English queries.
+   - Clinical considerations, urgency triage levels (Home Care, Routine Appointment, Urgent Care, Casualty).
+   - Doctor consultation questions tailored for Indian physicians.
 
 4. **Medical & Laboratory Report Explainer**:
-   - Translates dense laboratory and diagnostic reports (e.g., CBC, CMP, Lipid Panels, Urinalysis, Thyroid) into clear, accessible language.
-   - Highlights out-of-range biomarkers, normal intervals, and contextual clinical correlations.
+   - Translates dense laboratory and diagnostic reports (e.g., CBC, CMP, Lipid Panels, LFT, KFT/RFT, Thyroid, Dengue serology) from Indian diagnostic chains (Apollo, Dr Lal PathLabs, Vijaya, Metropolis, Thyrocare, etc.) into accessible language.
    - Generates targeted doctor consultation questions with one-click clipboard copying.
 
-5. **Zero-Build, Lightweight Architecture**:
+5. **Groq-Powered Ultra-Low Latency Inference**:
+   - Powered by `qwen/qwen3.8-27b` with instantaneous multi-model failover (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`) ensuring zero downtime and rate-limit resilience.
+
+6. **Zero-Build, Lightweight Architecture**:
    - Python FastAPI backend serving asynchronous clinical endpoints.
-   - Single-file responsive frontend built with Tailwind CSS via CDN and vanilla JavaScript.
-   - Zero Node.js or npm dependencies required.
+   - Single-file responsive frontend built with Tailwind CSS via CDN and vanilla JavaScript (zero npm/Node steps).
 
 ---
 
