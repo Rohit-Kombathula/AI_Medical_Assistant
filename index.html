@@ -4,15 +4,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>AI Medical Assistant | Clinical Triage & Report Explainer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Telugu:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <script>
+    /* Apply saved / system theme before first paint (no flash) */
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) { }
+    })();
+  </script>
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Marked.js for rendering clinical markdown responses -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- DOMPurify: sanitizes rendered markdown before it is injected -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: { sans: ['Inter', 'Noto Sans Telugu', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
           colors: {
             brand: {
               50: '#ecfdf5',
@@ -33,65 +54,232 @@
     }
   </script>
   <style>
-    /* Custom scrollbar styling */
+    :root {
+      --bg1: #f3f8f7;
+      --bg2: #e8f0f4;
+      --surface: #ffffff;
+      --surface2: #f6f9fa;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --thumb: #cbd5e1;
+      --thumb-h: #94a3b8;
+    }
+
+    .dark {
+      --bg1: #0a1114;
+      --bg2: #0c1519;
+      --surface: #111b20;
+      --surface2: #16242a;
+      --ink: #e6eef0;
+      --muted: #93a4ab;
+      --line: #24353d;
+      --thumb: #2e444d;
+      --thumb-h: #3d5864;
+      color-scheme: dark;
+    }
+
+    body {
+      font-family: 'Inter', 'Noto Sans Telugu', system-ui, sans-serif;
+      background:
+        radial-gradient(900px 500px at 8% -10%, rgba(16, 185, 129, .10), transparent 60%),
+        radial-gradient(800px 500px at 100% 0%, rgba(20, 184, 166, .08), transparent 55%),
+        linear-gradient(var(--bg1), var(--bg2));
+      color: var(--ink);
+    }
+
+    /* Scrollbars */
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
     }
 
     ::-webkit-scrollbar-track {
-      background: #f1f5f9;
+      background: transparent;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
+      background: var(--thumb);
       border-radius: 4px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
+      background: var(--thumb-h);
+    }
+
+    /* Surfaces */
+    .nav-glass {
+      background: color-mix(in srgb, var(--surface) 82%, transparent);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+
+    #view-triage,
+    #view-report>div {
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 12px 32px -16px rgba(15, 23, 42, .18);
+    }
+
+    .dark #view-triage,
+    .dark #view-report>div {
+      box-shadow: 0 12px 32px -16px rgba(0, 0, 0, .6);
+    }
+
+    button {
+      transition: background-color .15s, color .15s, border-color .15s, transform .1s, box-shadow .15s;
+    }
+
+    button:active:not(:disabled) {
+      transform: scale(.98);
+    }
+
+    button:focus-visible,
+    a:focus-visible {
+      outline: 2px solid #10b981;
+      outline-offset: 2px;
+    }
+
+    #chat-form button[onclick^="fillPrompt"],
+    #chat-messages button[onclick^="fillPrompt"] {
+      cursor: pointer;
+    }
+
+    #chat-messages button[onclick^="fillPrompt"]:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px -4px rgba(16, 185, 129, .35);
+    }
+
+    /* Message entrance */
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    #chat-messages>div {
+      animation: rise .35s ease both;
     }
 
     /* Markdown clinical response styling */
-    .clinical-prose h3 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: #0f172a;
-      margin-top: 1rem;
-      margin-bottom: 0.35rem;
-      border-bottom: 1px solid #e2e8f0;
-      padding-bottom: 0.2rem;
+    .clinical-prose {
+      color: var(--ink);
     }
 
+    .clinical-prose h2,
+    .clinical-prose h3,
+    .clinical-prose h4 {
+      font-weight: 700;
+      color: var(--ink);
+      margin: 1.1rem 0 .4rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: .25rem;
+      letter-spacing: -.01em;
+    }
+
+    .clinical-prose h2 {
+      font-size: 1.15rem;
+    }
+
+    .clinical-prose h3 {
+      font-size: 1.05rem;
+    }
+
+    .clinical-prose h4 {
+      font-size: .97rem;
+      border-bottom: 0;
+    }
+
+    .clinical-prose h2:first-child,
     .clinical-prose h3:first-child {
       margin-top: 0;
     }
 
     .clinical-prose p {
-      margin-bottom: 0.65rem;
-      line-height: 1.6;
-      font-size: 0.95rem;
+      margin-bottom: .65rem;
+      line-height: 1.65;
+      font-size: .95rem;
     }
 
     .clinical-prose ul {
-      list-style-type: disc;
+      list-style: disc;
       padding-left: 1.25rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: .75rem;
+    }
+
+    .clinical-prose ol {
+      list-style: decimal;
+      padding-left: 1.25rem;
+      margin-bottom: .75rem;
     }
 
     .clinical-prose li {
-      margin-bottom: 0.3rem;
-      font-size: 0.93rem;
+      margin-bottom: .3rem;
+      font-size: .93rem;
+      line-height: 1.6;
+    }
+
+    .clinical-prose li::marker {
+      color: #10b981;
     }
 
     .clinical-prose strong {
-      color: #0f172a;
+      color: var(--ink);
       font-weight: 600;
     }
 
     .clinical-prose hr {
-      border-color: #e2e8f0;
+      border-color: var(--line);
       margin: 1rem 0;
+    }
+
+    .clinical-prose a {
+      color: #059669;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .clinical-prose blockquote {
+      border-left: 3px solid #10b981;
+      background: rgba(16, 185, 129, .08);
+      padding: .55rem .9rem;
+      border-radius: 0 .6rem .6rem 0;
+      margin: .75rem 0;
+      font-size: .92rem;
+    }
+
+    .clinical-prose code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .85em;
+      background: var(--surface2);
+      border: 1px solid var(--line);
+      padding: .05rem .35rem;
+      border-radius: .35rem;
+    }
+
+    .clinical-prose table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: .75rem 0;
+      font-size: .86rem;
+      display: block;
+      overflow-x: auto;
+    }
+
+    .clinical-prose th,
+    .clinical-prose td {
+      border: 1px solid var(--line);
+      padding: .4rem .6rem;
+      text-align: left;
+    }
+
+    .clinical-prose th {
+      background: var(--surface2);
+      font-weight: 600;
     }
 
     @keyframes pulse-subtle {
@@ -102,17 +290,184 @@
       }
 
       50% {
-        opacity: 0.5;
+        opacity: .5;
       }
     }
 
     .animate-pulse-subtle {
-      animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      animation: pulse-subtle 2s cubic-bezier(.4, 0, .6, 1) infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      .animate-ping,
+      .animate-pulse-subtle,
+      #chat-messages>div {
+        animation: none !important;
+      }
+
+      button {
+        transition: none !important;
+      }
+    }
+
+    /* Theme toggle icons */
+    .dark .icon-moon,
+    html:not(.dark) .icon-sun {
+      display: none;
+    }
+
+    /* ===== Dark mode: remap the Tailwind utilities used in markup + JS templates ===== */
+    .dark .bg-white {
+      background-color: var(--surface);
+    }
+
+    .dark .bg-slate-50,
+    .dark .bg-slate-50\/90 {
+      background-color: var(--surface2);
+    }
+
+    .dark .bg-slate-100 {
+      background-color: #0c1519;
+    }
+
+    .dark .bg-slate-900 {
+      background-color: #0f766e;
+    }
+
+    .dark .bg-emerald-50,
+    .dark .bg-emerald-100 {
+      background-color: rgba(16, 185, 129, .15);
+    }
+
+    .dark .bg-teal-50,
+    .dark .bg-teal-100 {
+      background-color: rgba(20, 184, 166, .15);
+    }
+
+    .dark .bg-rose-50,
+    .dark .bg-rose-50\/40 {
+      background-color: rgba(244, 63, 94, .12);
+    }
+
+    .dark .bg-gradient-to-b {
+      background-image: linear-gradient(to bottom, rgba(16, 185, 129, .14), rgba(20, 184, 166, .05));
+    }
+
+    .dark .hover\:bg-slate-200\/60:hover {
+      background-color: rgba(148, 163, 184, .16);
+    }
+
+    .dark .hover\:bg-teal-100:hover {
+      background-color: rgba(20, 184, 166, .25);
+    }
+
+    .dark .hover\:bg-rose-100:hover {
+      background-color: rgba(244, 63, 94, .22);
+    }
+
+    .dark .text-slate-900,
+    .dark .text-slate-800,
+    .dark .text-slate-950 {
+      color: var(--ink);
+    }
+
+    .dark .text-slate-700,
+    .dark .text-slate-600 {
+      color: #c3d0d4;
+    }
+
+    .dark .text-slate-500 {
+      color: var(--muted);
+    }
+
+    .dark .text-slate-400 {
+      color: #7b8d94;
+    }
+
+    .dark .placeholder-slate-400::placeholder {
+      color: #6b7e86;
+    }
+
+    .dark .text-emerald-700,
+    .dark .text-emerald-800 {
+      color: #6ee7b7;
+    }
+
+    .dark .text-teal-700,
+    .dark .text-teal-800,
+    .dark .text-teal-900 {
+      color: #5eead4;
+    }
+
+    .dark .text-rose-700,
+    .dark .text-rose-800 {
+      color: #fda4af;
+    }
+
+    .dark .hover\:text-slate-900:hover,
+    .dark .hover\:text-slate-800:hover {
+      color: #fff;
+    }
+
+    .dark .hover\:text-emerald-700:hover {
+      color: #6ee7b7;
+    }
+
+    .dark .hover\:text-teal-900:hover {
+      color: #99f6e4;
+    }
+
+    .dark .hover\:text-rose-600:hover {
+      color: #fb7185;
+    }
+
+    .dark header .text-slate-950 {
+      color: #1c1300;
+    }
+
+    /* keep disclaimer banner legible */
+
+    .dark .border-slate-100,
+    .dark .border-slate-200,
+    .dark .border-slate-300,
+    .dark .border-slate-200\/80 {
+      border-color: var(--line);
+    }
+
+    .dark .border-emerald-200\/80,
+    .dark .border-emerald-200\/60,
+    .dark .border-emerald-300,
+    .dark .border-teal-200,
+    .dark .hover\:border-emerald-300:hover,
+    .dark .hover\:border-teal-300:hover {
+      border-color: rgba(52, 211, 153, .3);
+    }
+
+    .dark .border-rose-200 {
+      border-color: rgba(251, 113, 133, .35);
+    }
+
+    .dark .focus-within\:ring-emerald-200:focus-within,
+    .dark .focus\:ring-teal-300:focus {
+      --tw-ring-color: rgba(52, 211, 153, .28);
+    }
+
+    .dark .focus-within\:border-emerald-500:focus-within {
+      border-color: #34d399;
+    }
+
+    .dark .clinical-prose a {
+      color: #5eead4;
+    }
+
+    .dark .clinical-prose li::marker {
+      color: #34d399;
     }
   </style>
 </head>
 
-<body class="bg-slate-100 text-slate-800 antialiased flex flex-col h-screen overflow-hidden font-sans">
+<body class="text-slate-800 antialiased flex flex-col h-dvh overflow-hidden font-sans">
 
   <!-- 1. PERSISTENT MANDATORY CLINICAL DISCLAIMER BANNER -->
   <header class="bg-amber-500 text-slate-950 px-4 py-2 border-b border-amber-600 shadow-sm z-50 flex-shrink-0">
@@ -137,7 +492,7 @@
   </header>
 
   <!-- 2. APPLICATION TOP NAVIGATION BAR -->
-  <nav class="bg-white border-b border-slate-200 px-4 sm:px-6 py-3 flex-shrink-0 shadow-sm">
+  <nav class="nav-glass border-b border-slate-200 px-4 sm:px-6 py-3 flex-shrink-0 shadow-sm z-40">
     <div class="max-w-7xl mx-auto flex items-center justify-between">
       <!-- App Brand Title -->
       <div class="flex items-center gap-3">
@@ -162,23 +517,39 @@
         </div>
       </div>
 
-      <!-- Mode Switcher Tabs -->
-      <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium">
-        <button id="tab-triage-btn" onclick="switchTab('triage')"
-          class="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg bg-white text-emerald-700 shadow-sm font-semibold transition-all">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Mode Switcher Tabs -->
+        <div
+          class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium">
+          <button id="tab-triage-btn" onclick="switchTab('triage')"
+            class="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg bg-white text-emerald-700 shadow-sm font-semibold transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            <span>Symptom Triage</span>
+          </button>
+          <button id="tab-report-btn" onclick="switchTab('report')"
+            class="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Report Explainer</span>
+          </button>
+        </div>
+        <!-- Theme toggle -->
+        <button id="theme-toggle" type="button" onclick="toggleTheme()" title="Toggle light / dark mode"
+          aria-label="Toggle theme"
+          class="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-emerald-700 hover:border-emerald-300">
+          <svg class="icon-moon w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
           </svg>
-          <span>Symptom Triage</span>
-        </button>
-        <button id="tab-report-btn" onclick="switchTab('report')"
-          class="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="icon-sun w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
-          <span>Report Explainer</span>
         </button>
       </div>
     </div>
@@ -232,31 +603,32 @@
 
               <!-- Quick Prompt Pills -->
               <div class="mt-3.5 pt-3 border-t border-emerald-200/60">
-                <p class="text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-2">Example Scenarios / ఉదాహరణలు (Click to test):</p>
+                <p class="text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-2">Example Scenarios /
+                  ఉదాహరణలు (Click to test):</p>
                 <div class="flex flex-wrap gap-1.5 sm:gap-2">
                   <button
                     onclick="fillPrompt('I have had a throbbing unilateral headache with nausea and light sensitivity for 2 days.')"
-                    class="text-xs bg-white text-slate-700 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 px-2.5 py-1.5 rounded-lg transition shadow-xs text-left">
+                    class="text-xs bg-white text-slate-700 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 px-2.5 py-1.5 rounded-lg transition shadow-sm text-left">
                     🤕 Migraine / Throbbing headache
                   </button>
                   <button
                     onclick="fillPrompt('Persistent dry cough, fever 101°F, body aches and fatigue for 3 days in Hyderabad.')"
-                    class="text-xs bg-white text-slate-700 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 px-2.5 py-1.5 rounded-lg transition shadow-xs text-left">
+                    class="text-xs bg-white text-slate-700 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 px-2.5 py-1.5 rounded-lg transition shadow-sm text-left">
                     🌡️ 3-day Fever & Body aches (India)
                   </button>
                   <button
                     onclick="fillPrompt('నాకు 3 రోజుల నుండి తీవ్రమైన జ్వరం (101°F), ఒళ్లు నొప్పులు మరియు విపరీతమైన తలనొప్పి ఉన్నాయి.')"
-                    class="text-xs bg-white text-slate-700 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 px-2.5 py-1.5 rounded-lg transition shadow-xs text-left">
+                    class="text-xs bg-white text-slate-700 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 px-2.5 py-1.5 rounded-lg transition shadow-sm text-left">
                     🇮🇳 తెలుగు: తీవ్రమైన జ్వరం, ఒళ్లు నొప్పులు
                   </button>
                   <button
                     onclick="fillPrompt('Crushing chest pressure radiating to my left arm with shortness of breath and cold sweat.')"
-                    class="text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-lg transition shadow-xs text-left font-medium">
+                    class="text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-lg transition shadow-sm text-left font-medium">
                     🚨 Emergency Red-Flag (Chest Pain)
                   </button>
                   <button
                     onclick="fillPrompt('నాకు ఛాతీలో విపరీతమైన నొప్పి ఉంది, ఎడమ చెయ్యి లాగుతోంది, శ్వాస తీసుకోవడం కష్టంగా ఉంది.')"
-                    class="text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-lg transition shadow-xs text-left font-medium">
+                    class="text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-lg transition shadow-sm text-left font-medium">
                     🚨 తెలుగు అత్యవసర హెచ్చరిక (గుండె నొప్పి / 108)
                   </button>
                 </div>
@@ -270,7 +642,7 @@
       <div class="p-3 sm:p-4 bg-slate-50 border-t border-slate-200 flex-shrink-0">
         <form id="chat-form" onsubmit="handleChatSubmit(event)" class="max-w-4xl mx-auto flex flex-col gap-2">
           <div
-            class="relative flex items-end bg-white border border-slate-300 rounded-xl shadow-xs focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-200 transition-all">
+            class="relative flex items-end bg-white border border-slate-300 rounded-xl shadow-sm focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-200 transition-all">
             <textarea id="chat-input" rows="2"
               placeholder="Describe symptoms, duration, intensity (1-10), and triggers... (Enter to send, Shift+Enter for new line)"
               class="w-full resize-none p-3 pr-24 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none"
@@ -358,7 +730,7 @@ Triglycerides: 190 mg/dL (Reference: < 150) HIGH"></textarea>
             <span class="text-sm font-semibold text-slate-800">Plain-Language Clinical Breakdown</span>
           </div>
           <button id="copy-questions-btn" onclick="copyDoctorQuestions()"
-            class="hidden text-xs text-teal-700 hover:text-teal-900 bg-white border border-slate-200 hover:border-teal-300 px-2.5 py-1 rounded shadow-xs transition">
+            class="hidden text-xs text-teal-700 hover:text-teal-900 bg-white border border-slate-200 hover:border-teal-300 px-2.5 py-1 rounded shadow-sm transition">
             📋 Copy Doctor Questions
           </button>
         </div>
@@ -390,6 +762,24 @@ Triglycerides: 190 mg/dL (Reference: < 150) HIGH"></textarea>
 
   <!-- JAVASCRIPT APPLICATION LOGIC -->
   <script>
+    // ---- UI helpers (theme, sanitizing, textarea auto-grow) ----
+    function safeHtml(html) {
+      return window.DOMPurify ? DOMPurify.sanitize(html) : html;
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      try { localStorage.setItem('theme', isDark ? 'dark' : 'light'); } catch (e) { }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const chatInput = document.getElementById('chat-input');
+      chatInput.addEventListener('input', () => {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
+      });
+    });
+
     // State
     let conversationHistory = [];
     let isAnalyzing = false;
@@ -545,7 +935,7 @@ Triglycerides: 190 mg/dL (Reference: < 150) HIGH"></textarea>
              Clinical Assistant Guidance
            </div>`;
 
-      const parsedHtml = marked.parse(markdownText);
+      const parsedHtml = safeHtml(marked.parse(markdownText));
 
       div.innerHTML = `
         <div class="max-w-[92%] sm:max-w-2xl ${borderClass} rounded-2xl rounded-tl-sm p-4 sm:p-5 shadow-sm text-slate-800">
@@ -691,7 +1081,7 @@ THYROID:
         }
 
         const data = await response.json();
-        contentDiv.innerHTML = marked.parse(data.summary);
+        contentDiv.innerHTML = safeHtml(marked.parse(data.summary));
         lastSuggestedQuestions = data.suggested_questions || [];
 
         if (lastSuggestedQuestions.length > 0) {
